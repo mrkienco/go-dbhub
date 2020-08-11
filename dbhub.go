@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	com "github.com/sqlitebrowser/dbhub.io/common"
 )
@@ -284,6 +285,57 @@ func (c Connection) Views(dbOwner, dbName string, ident Identifier) (views []str
 	// Fetch the list of views
 	queryUrl := c.Server + "/v1/views"
 	err = sendRequestJSON(queryUrl, data, &views)
+	return
+}
+
+// Upload uploads a new database, or a new revision of a database
+func (c Connection) Upload(dbName string, info UploadInformation, dbBytes *[]byte) (err error) {
+	// Prepare the API parameters
+	data := c.PrepareVals("", dbName, info.Ident)
+	data.Del("dbowner") // The upload function always stores the database in the account of the API key user
+	if info.CommitMsg != "" {
+		data.Set("commitmsg", info.CommitMsg)
+	}
+	if info.SourceURL != "" {
+		data.Set("sourceurl", info.SourceURL)
+	}
+	if !info.LastModified.IsZero() {
+		data.Set("lastmodified", info.LastModified.Format(time.RFC3339))
+	}
+	if info.Licence != "" {
+		data.Set("licence", info.Licence)
+	}
+	if info.Public != "" {
+		data.Set("public", info.Public)
+	}
+	if info.Force {
+		data.Set("force", "true")
+	}
+	if !info.CommitTimestamp.IsZero() {
+		data.Set("committimestamp", info.CommitTimestamp.Format(time.RFC3339))
+	}
+	if info.AuthorName != "" {
+		data.Set("authorname", info.AuthorName)
+	}
+	if info.AuthorEmail != "" {
+		data.Set("authoremail", info.AuthorEmail)
+	}
+	if info.CommitterName != "" {
+		data.Set("committername", info.CommitterName)
+	}
+	if info.CommitterEmail != "" {
+		data.Set("committeremail", info.CommitterEmail)
+	}
+	if info.OtherParents != "" {
+		data.Set("otherparents", info.OtherParents)
+	}
+	if info.ShaSum != "" {
+		data.Set("dbshasum", info.ShaSum)
+	}
+
+	// Upload the database
+	queryUrl := c.Server + "/v1/upload"
+	err = sendUpload(queryUrl, &data, dbBytes)
 	return
 }
 

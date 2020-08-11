@@ -22,6 +22,7 @@ A Go library for accessing and using SQLite databases stored remotely on DBHub.i
 * Tests for each function
 * Have the backend server correctly use the incoming branch, release, and tag information
 * Upload a complete database
+  * Backend server docs for upload end point
 * Investigate what would be needed for this to work through the Go SQL API
 * Anything else people suggest and seems like a good idea :smile:
 

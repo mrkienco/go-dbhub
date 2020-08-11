@@ -1,9 +1,11 @@
 package dbhub
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -61,9 +63,71 @@ func sendRequest(queryUrl string, data url.Values) (body io.ReadCloser, err erro
 		return
 	}
 
-	// Return the response body, even if an error occured.  This lets us return useful error information provided as
+	// Return the response body, even if an error occurred.  This lets us return useful error information provided as
 	// JSON in the body of the message
 	body = resp.Body
+
+	// Basic error handling, based on the status code received from the server
+	if resp.StatusCode != 200 {
+		// The returned status code indicates something went wrong
+		err = fmt.Errorf(resp.Status)
+		return
+	}
+	return
+}
+
+// sendUpload uploads a database to DBHub.io.  It exists because the DBHub.io upload end point requires multi-part data
+func sendUpload(queryUrl string, data *url.Values, dbBytes *[]byte) (err error) {
+	// Prepare the database file byte stream
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	dbName := data.Get("dbname")
+	var wri io.Writer
+	if dbName != "" {
+		wri, err = w.CreateFormFile("file", dbName)
+	} else {
+		wri, err = w.CreateFormFile("file", "database.db")
+	}
+	if err != nil {
+		return
+	}
+	_, err = wri.Write(*dbBytes)
+	if err != nil {
+		return err
+	}
+
+	// Add the headers
+	for i, j := range *data {
+		wri, err = w.CreateFormField(i)
+		if err != nil {
+			return
+		}
+		_, err = wri.Write([]byte(j[0]))
+		if err != nil {
+			return err
+		}
+	}
+	err = w.Close()
+	if err != nil {
+		return err
+	}
+
+	// Prepare the request
+	var req *http.Request
+	var resp *http.Response
+	var client http.Client
+	req, err = http.NewRequest(http.MethodPost, queryUrl, &buf)
+	if err != nil {
+		return
+	}
+	req.Header.Set("User-Agent", fmt.Sprintf("go-dbhub v%s", version))
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	// Upload the database
+	resp, err = client.Do(req)
+	if err != nil {
+		return
+	}
 
 	// Basic error handling, based on the status code received from the server
 	if resp.StatusCode != 200 {
